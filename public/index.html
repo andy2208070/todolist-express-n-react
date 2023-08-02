@@ -4,9 +4,105 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.4.0/axios.min.js" integrity="sha512-uMtXmF28A2Ab/JJO2t/vYhlaa/3ahUOgj1Zf27M5rOo8/+fcTUVH0/E0ll68njmjrLqOBjXM3V9NiPFL5ywWPQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Hello</title>
+    <style>
+        table,tr,th,td{
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 5px;
+        }
+    </style>
 </head>
 <body>
-    xxxxx
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useEffect, useState } = React;
+        const apiUrl = 'http://localhost:3456';
+        const setEditProp = (arr)=>{
+            const result = arr.map(item=>({...item, editting: false, tempValue:item.title||''}));
+            return result;
+        }
+        const getTodolist = async() => {
+           let result ;
+           await axios.get(`${apiUrl}/todo`)
+            .then((response)=>response.data||[])
+            .then((data)=>result=data);
+            return setEditProp(result);
+        }
+        const createTodoItem = async(title) => {
+            title = title.trim();
+            if(title===''||title===null||title===undefined) return;
+            const todoObj = { title,};
+            let result;
+            await axios.post(`${apiUrl}/todo`, todoObj)
+            .then((response)=>response.data||[])
+            .then((data)=>result=data);
+            return setEditProp(result);
+        }
+       
+        function App(){
+            const [newTitle, setNewTitle] = useState('');
+            const [todos, setTodos] = useState([]);
+            const createHandler = async(event) => {
+                event.preventDefault();
+                const newTodos = await createTodoItem(newTitle);
+                setTodos(newTodos);
+                setNewTitle('');
+            }
+            const editHandler = (id, prop, value) => {
+                const newArr = todos.map(todo=>{
+                    const idx = todo.findIndex(item=>item.id===id);
+                    todo[idx][prop] = value;
+                    return todo;
+                })
+                setTodos(newArr);
+            }
+            useEffect(async()=>{
+                const result = await getTodolist();
+                console.log(result)
+                setTodos(result);
+            },[]);
+            useEffect(()=>{
+                setTodos(prev=>prev);
+            },[todos]);
+            return (<div>
+                <form onSubmit={createHandler}>
+                    <input value={newTitle} onChange={e=>setNewTitle(e.target.value)} name="newTitle"/>
+                    <button type="submit">OK</button>
+                </form>
+                <hr/>
+                <table>
+                    <thead><tr>
+                        <th>No.</th>
+                        <th>Title</th>
+                        <th>Title</th>
+                    </tr></thead>
+                    <thead>
+                        {
+                            todos.map((todo,idx) => <tr key={todo.id}>
+                                <td>{idx+1}</td>
+                                <td>{!todo.editting&&todo.title}
+                                    {todo.eidtting &&
+                                        <input value={todo.tempValue} />
+                                    }
+                                </td>
+                                <td>
+                                    <button onClick={()=>{editHandler(todo.id, 'editting', true)}}>Edit</button>
+                                    <button onClick={()=>{}}>Remove</button>
+                                </td>
+                            </tr>)
+                        }
+                    </thead>
+                </table>
+            </div>);
+        }
+        // const rootElm = document.querySelector('#root');
+        const rootElm = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElm).render(<App/>);
+    </script>
 </body>
 </html>
