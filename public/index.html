@@ -22,26 +22,45 @@
     <script type="text/babel">
         const { useEffect, useState } = React;
         const apiUrl = 'http://localhost:3456';
-        const setEditProp = (arr)=>{
-            const result = arr.map(item=>({...item, editting: false, tempValue:item.title||''}));
+        const setEditProp = (data)=>{
+            let result;
+            if(Array.isArray(data)){
+                result = data.map(item=>({...item, editting: false, tempValue:item.title||''}));
+            } else {
+                result = {...data, editting: false, tempValue: data.title||'' };
+            }
             return result;
         }
+        const svc = {
+            handler: async(response) => {
+                let result; await response.then((response)=>response.data||null).then((data)=>result=data);
+                return result;
+            },
+            get: async(apiStr) =>  await svc.handler(axios.get(`${apiUrl}${apiStr}`)),
+            post: async(apiStr, data) => await svc.handler(axios.post(`${apiUrl}${apiStr}`, data)),
+            patch: async(apiStr, id, data) => await svc.handler(axios.patch(`${apiUrl}${apiStr}/${id}`, data)),
+            delete: async(apiStr, id) => await svc.handler(axios.delete(`${apiUrl}${apiStr}/${id}`)),
+        };
+
         const getTodolist = async() => {
-           let result ;
-           await axios.get(`${apiUrl}/todo`)
-            .then((response)=>response.data||[])
-            .then((data)=>result=data);
-            return setEditProp(result);
+            const result = setEditProp(await svc.get('/todo'));
+            return result;
         }
         const createTodoItem = async(title) => {
-            title = title.trim();
-            if(title===''||title===null||title===undefined) return;
-            const todoObj = { title,};
-            let result;
-            await axios.post(`${apiUrl}/todo`, todoObj)
-            .then((response)=>response.data||[])
-            .then((data)=>result=data);
-            return setEditProp(result);
+            const todoObj = { title,};            
+            const result = setEditProp(await svc.post('/todo', todoObj));
+            return result;
+        }
+        const updateTodoItem = async(id, data)=>{
+            const res = await svc.patch('/todo',id,data);
+            const result = setEditProp(res);
+            return result;
+        }
+       
+        const removeTodoItem = async(id)=>{
+            const res = await svc.delete('/todo',id);
+            const result = setEditProp(res);
+            return result;
         }
        
         function App(){
@@ -49,28 +68,38 @@
             const [todos, setTodos] = useState([]);
             const createHandler = async(event) => {
                 event.preventDefault();
-                const newTodos = await createTodoItem(newTitle);
-                setTodos(newTodos);
+                let title = newTitle.trim();
+                if(title===''||title===null||title===undefined) return;
+                const newTodos = await createTodoItem(title);
+                setTodos(prev=> [...prev, newTodos]);
                 setNewTitle('');
             }
-            const editHandler = (id, prop, value) => {
-                const newArr = todos.map(todo=>{
-                    const idx = todo.findIndex(item=>item.id===id);
-                    todo[idx][prop] = value;
-                    return todo;
-                })
-                setTodos(newArr);
+            const editHandler = (id, columns) => {
+                const arr = [...todos];
+                const idx = arr.findIndex(todo => todo.id===id);
+                if(idx<0)return;
+                columns.forEach(({prop, value})=>arr[idx][prop] = value);
+                setTodos(arr);
+            }
+            const confrimUpdate = async (id) => {
+                const target = todos.find(todo => todo.id===id);
+                const updateTody = await updateTodoItem(id, {title: target.tempValue});
+                editHandler(id, [
+                    {prop: 'title', value: target.tempValue},
+                    {prop: 'editting', value: false},
+                ]);
+            }
+            const removeHandler = async(id) => {
+                const newTodos = await removeTodoItem(id);
+                const result = setEditProp(newTodos);
+                setTodos(result);
             }
             useEffect(async()=>{
                 const result = await getTodolist();
-                console.log(result)
                 setTodos(result);
             },[]);
-            useEffect(()=>{
-                setTodos(prev=>prev);
-            },[todos]);
             return (<div>
-                <form onSubmit={createHandler}>
+                <form onSubmit={(e)=>createHandler(e)}>
                     <input value={newTitle} onChange={e=>setNewTitle(e.target.value)} name="newTitle"/>
                     <button type="submit">OK</button>
                 </form>
@@ -85,14 +114,34 @@
                         {
                             todos.map((todo,idx) => <tr key={todo.id}>
                                 <td>{idx+1}</td>
-                                <td>{!todo.editting&&todo.title}
-                                    {todo.eidtting &&
-                                        <input value={todo.tempValue} />
+                                <td>
+                                    {
+                                        !todo.editting
+                                        ?todo.title
+                                        :<input value={todo.tempValue} onChange={(e)=> editHandler(todo.id,[
+                                            {prop:'tempValue',value:e.target.value},
+                                        ]) } />
                                     }
                                 </td>
                                 <td>
-                                    <button onClick={()=>{editHandler(todo.id, 'editting', true)}}>Edit</button>
-                                    <button onClick={()=>{}}>Remove</button>
+                                    {
+                                        !todo.editting
+                                        ?(<div>
+                                            <button onClick={()=>editHandler(todo.id,[
+                                                {prop:'tempValue',value:todo.title},
+                                                {prop:'editting',value:true},
+                                            ])}>Edit</button>
+                                            <button onClick={()=>removeHandler(todo.id)}>Remove</button>
+                                        </div>
+                                        )
+                                        :(<div>
+                                            <button onClick={()=>confrimUpdate(todo.id)}>✅</button>
+                                            <button onClick={()=>editHandler(todo.id,[
+                                                {prop:'editting',value:false},
+                                            ])}>❌</button>
+                                        </div>)
+                                    }
+                                    
                                 </td>
                             </tr>)
                         }
