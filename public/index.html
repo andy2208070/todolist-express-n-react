@@ -46,22 +46,6 @@
             const result = setEditProp(await svc.get('/todo'));
             return result;
         }
-        const createTodoItem = async(title) => {
-            const todoObj = { title,};            
-            const result = setEditProp(await svc.post('/todo', todoObj));
-            return result;
-        }
-        const updateTodoItem = async(id, data)=>{
-            const res = await svc.patch('/todo',id,data);
-            const result = setEditProp(res);
-            return result;
-        }
-       
-        const removeTodoItem = async(id)=>{
-            const res = await svc.delete('/todo',id);
-            const result = setEditProp(res);
-            return result;
-        }
        
         function App(){
             const [newTitle, setNewTitle] = useState('');
@@ -70,7 +54,7 @@
                 event.preventDefault();
                 let title = newTitle.trim();
                 if(title===''||title===null||title===undefined) return;
-                const newTodos = await createTodoItem(title);
+                const newTodos = setEditProp(await svc.post('/todo', {title}))
                 setTodos(prev=> [...prev, newTodos]);
                 setNewTitle('');
             }
@@ -83,14 +67,15 @@
             }
             const confrimUpdate = async (id) => {
                 const target = todos.find(todo => todo.id===id);
-                const updateTody = await updateTodoItem(id, {title: target.tempValue});
+                const data = {title: target.tempValue};
+                const updateTody = setEditProp(await svc.patch('/todo',id,data));
                 editHandler(id, [
                     {prop: 'title', value: target.tempValue},
                     {prop: 'editting', value: false},
                 ]);
             }
             const removeHandler = async(id) => {
-                const newTodos = await removeTodoItem(id);
+                const newTodos = setEditProp(await svc.delete('/todo',id));
                 const result = setEditProp(newTodos);
                 setTodos(result);
             }
